@@ -4,6 +4,7 @@ from selenium.webdriver.common.by import By
 import keyboard
 import time
 import json
+import re
 
 with open('playlist.json', 'r') as f:
     video_links = json.load(f)        
@@ -54,10 +55,14 @@ while i < num:
     video_duration = driver.execute_script("return arguments[0].duration;", video)
     minutes = int(video_duration // 60)
     seconds = int(video_duration % 60)
-    song_name = driver.find_element(By.CLASS_NAME, "tag-txt")
+    temp_song_name = driver.find_element(By.CLASS_NAME, "tag-txt")
+    pattern = re.compile(re.escape("发现《"))
+    song_name = pattern.sub('', temp_song_name.text)
+    pattern = re.compile(r'》')
+    song_name = pattern.sub('', song_name)
     driver.execute_script("arguments[0].play();", video)
     if song_name is not None:
-        print(f"                  | ♫ {song_name.text}    {minutes:02d}:{seconds:02d}")
+        print(f"                  | ♫ {song_name}    {minutes:02d}:{seconds:02d}")
     while not driver.execute_script("return arguments[0].ended;", video):
         if keyboard.is_pressed('ctrl+0'):
             if is_lock:
