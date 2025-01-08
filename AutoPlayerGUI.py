@@ -78,7 +78,11 @@ def play_loop():
             song_name_label.config(text=f"♫ {song_name}")
             current_time_label.config(text="00:00")
             duration_label.config(text=f"/ {minutes:02d}:{seconds:02d}")
-        while not driver.execute_script("return arguments[0].ended;", video):
+        while True:
+            if stop_thread:
+                return
+            if driver.execute_script("return arguments[0].ended;", video):
+                break
             current_time = driver.execute_script("return arguments[0].currentTime;", video)
             minutes = int(current_time // 60)
             seconds = int(current_time % 60)
@@ -155,6 +159,12 @@ def on_closing():
     global stop_thread
     stop_thread = True  # 设置标志位为True，通知线程结束
     win.destroy()  # 销毁窗口
+    driver.quit()  # 确保 WebDriver 正确关闭
+    # 等待线程结束
+    for thread in threading.enumerate():
+        if thread != threading.current_thread():
+            thread.join()
+
 
 head_frame = tk.Frame(win)
 song_name_label = tk.Label(head_frame, text="♫")
@@ -191,4 +201,5 @@ threading.Thread(target=play_loop).start()
 
 win.mainloop()
 
-driver.quit()
+if not stop_thread:
+    driver.quit()
