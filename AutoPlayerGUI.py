@@ -1,6 +1,9 @@
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 import tkinter as tk
+from tkinter import font
+import ctypes
+import random
 import time
 import json
 import re
@@ -8,6 +11,7 @@ import threading
 
 with open('playlist.json', 'r') as f:
     video_links = json.load(f)
+temp_list = []
 
 driver = webdriver.Edge()
 driver.get('https://www.bilibili.com/')
@@ -27,16 +31,29 @@ driver.get('https://www.bilibili.com/')
 
 win = tk.Tk()
 win.title("AutoPlayer")
+
+#告诉操作系统使用程序自身的dpi适配
+ctypes.windll.shcore.SetProcessDpiAwareness(1)
+#获取屏幕的缩放因子
+ScaleFactor=ctypes.windll.shcore.GetScaleFactorForDevice(0)
+#设置程序缩放
+win.tk.call('tk', 'scaling', ScaleFactor/75)
+
+# 全局变量
+stop_thread = False  # 标志位，用于结束线程
 is_first_video = True
 is_loop = True
+is_repeat = False
+is_shuffle = False
 is_pause = False
 is_next = False
 is_prev = False
+play_mode = 1
+play_mode_num = 4 # 4种播放模式
 i = 0
 video_duration = 0
 video = 0
 num = len(video_links)
-stop_thread = False  # 标志位，用于结束线程
 
 def play_loop():
     global i
@@ -73,9 +90,11 @@ def play_loop():
         song_name = pattern.sub('', temp_song_name.text)
         pattern = re.compile(r'》')
         song_name = pattern.sub('', song_name)
+        song_name = re.sub(r'[‘’]', "'", song_name)
+        song_name = re.sub(r'[“”]', '"', song_name)
         driver.execute_script("arguments[0].play();", video)
         if song_name is not None:
-            song_name_label.config(text=f"♫ {song_name}")
+            song_name_label.config(text=f"♫ {song_name} ")
             current_time_label.config(text="00:00")
             duration_label.config(text=f"/ {minutes:02d}:{seconds:02d}")
         while True:
@@ -96,7 +115,8 @@ def play_loop():
                 is_prev = False
                 break
             time.sleep(1)
-        i += 1
+        if not is_repeat:
+            i += 1
 
 def play_video():
     global video
@@ -118,7 +138,6 @@ def play_or_pause():
         pause_video()
 
 def next_video():
-    global i
     global video_duration
     global video
     global is_next 
@@ -132,7 +151,7 @@ def prev_video():
     global is_prev
     i -= 2
     if i < 0 and is_loop:
-        i = num - 1
+        i = num - 2
     is_prev = True
     #driver.execute_script(f"arguments[0].currentTime = {video_duration};", video)
 
@@ -146,14 +165,51 @@ def fast_reverse_video():
     global video_duration
     driver.execute_script("if (arguments[0].currentTime - 5 <= 0) arguments[0].currentTime = 0; else arguments[0].currentTime -= 5;", video)
 
+def shuffle_video():
+    global video_links
+    global temp_list
+    temp_list = list(video_links)
+    random.shuffle(video_links)
+
+def revert_video():
+    global is_shuffle
+    global video_links
+    global temp_list
+    if is_shuffle:
+        video_links = list(temp_list)
+        is_shuffle = False
+
 def toggle_loop():
+    global play_mode
     global is_loop
-    if is_loop:
-        is_loop = False
-        loop_button.config(text="➡️")
-    else:
+    global is_repeat
+    global is_shuffle
+    
+    play_mode += 1
+    if play_mode > play_mode_num:
+        play_mode = 1
+    
+    if play_mode == 1:  # 1-列表循环
         is_loop = True
+        is_repeat = False
         loop_button.config(text="🔁")
+        revert_video()
+    elif play_mode == 2:  # 2-顺序播放
+        is_loop = False
+        is_repeat = False
+        loop_button.config(text="➡️")
+        revert_video()
+    elif play_mode == 3:  # 3-单曲循环
+        is_loop = False
+        is_repeat = True
+        loop_button.config(text="🔂")
+        revert_video()
+    if play_mode == 4:  # 4-随机播放
+        is_loop = True
+        is_repeat = False
+        is_shuffle = True
+        loop_button.config(text="🔀")
+        shuffle_video()
 
 def on_closing():
     global stop_thread
@@ -166,19 +222,23 @@ def on_closing():
             thread.join()
 
 
+head_font = font.Font(font=("微软雅黑", 12))
+time_font = font.Font(font=("微软雅黑", 8))
+button_font = font.Font(font=("微软雅黑", 14))
+
 head_frame = tk.Frame(win)
-song_name_label = tk.Label(head_frame, text="♫")
-current_time_label = tk.Label(head_frame)
-duration_label = tk.Label(head_frame)
+song_name_label = tk.Label(head_frame, text="♫", font=head_font)
+current_time_label = tk.Label(head_frame, font=time_font)
+duration_label = tk.Label(head_frame, font=time_font)
 
 # 创建按钮
 button_frame = tk.Frame(win)
-prev_button = tk.Button(button_frame, text="⏮️", command=prev_video)
-fast_reverse_button = tk.Button(button_frame, text="⏪", command=fast_reverse_video)
-play_button = tk.Button(button_frame, text="⏸️", command=play_or_pause)
-fast_forward_button = tk.Button(button_frame, text="⏩", command=fast_forward_video)
-next_button = tk.Button(button_frame, text="⏭️", command=next_video)
-loop_button = tk.Button(button_frame, text="🔁", command=toggle_loop)
+prev_button = tk.Button(button_frame, text="⏮️", command=prev_video, font=button_font)
+fast_reverse_button = tk.Button(button_frame, text="⏪", command=fast_reverse_video, font=button_font)
+play_button = tk.Button(button_frame, text="⏸️", command=play_or_pause, font=button_font)
+fast_forward_button = tk.Button(button_frame, text="⏩", command=fast_forward_video, font=button_font)
+next_button = tk.Button(button_frame, text="⏭️", command=next_video, font=button_font)
+loop_button = tk.Button(button_frame, text="🔁", command=toggle_loop, font=button_font)
 
 # 布局按钮为水平
 song_name_label.pack(side="left")
