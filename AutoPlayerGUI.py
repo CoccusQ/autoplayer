@@ -31,6 +31,7 @@ driver.get('https://www.bilibili.com/')
 
 win = tk.Tk()
 win.title("AutoPlayer")
+win.attributes("-topmost", True)
 
 #告诉操作系统使用程序自身的dpi适配
 ctypes.windll.shcore.SetProcessDpiAwareness(1)
@@ -203,7 +204,6 @@ def toggle_loop():
         is_loop = False
         is_repeat = True
         loop_button.config(text="🔂")
-        revert_video()
     if play_mode == 4:  # 4-随机播放
         is_loop = True
         is_repeat = False
